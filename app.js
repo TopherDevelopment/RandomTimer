@@ -1,3 +1,6 @@
+window.__rt = window.__rt || {};
+window.__rt.isRunning = () => state.isRunning;
+
 // State
 const state = {
     isRunning: false,

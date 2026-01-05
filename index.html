@@ -2,7 +2,8 @@
 <html lang="en">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, viewport-fit=cover, maximum-scale=1.0, user-scalable=no">
+
     <meta name="theme-color" content="#0f172a">
     <meta name="apple-mobile-web-app-capable" content="yes">
     <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
@@ -23,6 +24,12 @@
                 opacity: 1;
             }
         }
+        @keyframes fadeIn {
+            from { opacity: 0; transform: scale(0.98); }
+            to   { opacity: 1; transform: scale(1); }
+        }
+        .animate-fade-in { animation: fadeIn 180ms ease-out; }
+
 
         .animate-breathe {
             animation: breathe 3s infinite ease-in-out;
@@ -50,11 +57,18 @@
         * {
             -webkit-tap-highlight-color: transparent;
         }
+        .safe-area {
+            padding-top: env(safe-area-inset-top);
+            padding-right: env(safe-area-inset-right);
+            padding-bottom: env(safe-area-inset-bottom);
+            padding-left: env(safe-area-inset-left);
+        }
+
     </style>
 </head>
-<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen font-sans selection:bg-indigo-500 selection:text-white overflow-hidden fixed w-full">
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-dvh` font-sans selection:bg-indigo-500 selection:text-white overflow-hidden fixed w-full">
 
-<div id="app" class="h-full w-full flex flex-col items-center justify-center p-4 md:p-8 overflow-y-auto">
+<div id="app" class="safe-area h-full w-full flex flex-col items-center justify-center p-4 md:p-8 overflow-y-auto">
 
     <!-- Main Container -->
     <div class="glass-panel w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative transition-all duration-500 flex flex-col max-h-[90vh]">
@@ -192,9 +206,12 @@
 <script>
     if ('serviceWorker' in navigator) {
         navigator.serviceWorker.register('./sw.js');
+
         navigator.serviceWorker.addEventListener('controllerchange', () => {
-            // when a new version takes over, reload
-            window.location.reload();
+            // Only reload if not actively running a timer
+            const canReload = window.__rt?.isRunning ? !window.__rt.isRunning() : true;
+            if (canReload) window.location.reload();
+            // else: skip reload (you can show a “refresh” banner if you want)
         });
     }
 </script>
