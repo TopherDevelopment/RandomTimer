@@ -199,6 +199,41 @@
         currentDuration: 0 // ms
     };
 
+    // --- iOS audio unlock / shared AudioContext ---
+    const audio = {
+        ctx: null,
+        unlocked: false
+    };
+
+    const initAudio = () => {
+        if (audio.unlocked) return;
+
+        const AC = window.AudioContext || window.webkitAudioContext;
+        if (!AC) return;
+
+        audio.ctx = audio.ctx || new AC();
+
+        // Must be called from a user gesture on iOS
+        audio.ctx.resume?.().catch(() => {});
+
+        // Tiny “blip” to fully unlock audio output on iOS
+        const osc = audio.ctx.createOscillator();
+        const gain = audio.ctx.createGain();
+        gain.gain.value = 0.0001; // basically silent
+        osc.connect(gain);
+        gain.connect(audio.ctx.destination);
+
+        osc.start();
+        osc.stop(audio.ctx.currentTime + 0.02);
+
+        audio.unlocked = true;
+    };
+
+    // As a fallback, unlock on first interaction anywhere
+    document.addEventListener('touchend', initAudio, { once: true });
+    document.addEventListener('click', initAudio, { once: true });
+
+
     // DOM Elements
     const els = {
         startBtn: document.getElementById('startBtn'),
@@ -245,14 +280,11 @@
     const playAlarmSound = () => {
         if (state.isMuted) return;
 
-        const AudioContext = window.AudioContext || window.webkitAudioContext;
-        if (!AudioContext) return;
+        const ctx = audio.ctx;
+        if (!ctx || !audio.unlocked) return; // iOS will block if not unlocked
 
-        const ctx = new AudioContext();
-
-        // Create a simple melody
-        const notes = [880, 1100, 880, 1100, 1320, 880]; // Frequencies in Hz
-        const duration = 0.15; // Seconds per note
+        const notes = [880, 1100, 880, 1100, 1320, 880];
+        const duration = 0.15;
 
         notes.forEach((freq, i) => {
             const osc = ctx.createOscillator();
@@ -265,8 +297,7 @@
             gain.connect(ctx.destination);
 
             const startTime = ctx.currentTime + (i * duration);
-
-            gain.gain.setValueAtTime(0.2, startTime);
+            gain.gain.setValueAtTime(0.25, startTime);
             gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration - 0.05);
 
             osc.start(startTime);
@@ -377,7 +408,10 @@
     };
 
     // Event Listeners
-    els.startBtn.addEventListener('click', startTimer);
+    els.startBtn.addEventListener('click', () => {
+  initAudio();
+  startTimer();
+});
     els.stopBtn.addEventListener('click', stopTimer);
 
     els.muteBtn.addEventListener('click', () => {
@@ -443,10 +477,10 @@
 
     // Click on the big circle acts as Start/Stop depending on state
     els.statusCircle.addEventListener('click', () => {
-        if (!state.isRunning && !state.endTime) {
-            startTimer();
-        }
+        initAudio();
+        if (!state.isRunning && !state.endTime) startTimer();
     });
+
 
     // Clean slate on load
     stopTimer();
