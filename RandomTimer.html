@@ -1,0 +1,456 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="apple-mobile-web-app-capable" content="yes">
+    <meta name="apple-mobile-web-app-status-bar-style" content="black-translucent">
+    <meta name="apple-mobile-web-app-title" content="Random Timer">
+
+    <title>Random Interval Timer</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <script src="https://unpkg.com/lucide@latest"></script>
+    <style>
+        /* Animation for the pulsing circle */
+        @keyframes breathe {
+            0%, 100% {
+                transform: scale(1);
+                opacity: 0.8;
+            }
+            50% {
+                transform: scale(1.05);
+                opacity: 1;
+            }
+        }
+
+        .animate-breathe {
+            animation: breathe 3s infinite ease-in-out;
+        }
+
+        /* Hide number input spinners */
+        input[type=number]::-webkit-inner-spin-button,
+        input[type=number]::-webkit-outer-spin-button {
+            -webkit-appearance: none;
+            margin: 0;
+        }
+
+        input[type=number] {
+            -moz-appearance: textfield;
+        }
+
+        .glass-panel {
+            background: rgba(30, 41, 59, 0.7);
+            backdrop-filter: blur(12px);
+            -webkit-backdrop-filter: blur(12px);
+            border: 1px solid rgba(255, 255, 255, 0.1);
+        }
+
+        /* Prevent tap highlight on mobile */
+        * {
+            -webkit-tap-highlight-color: transparent;
+        }
+    </style>
+</head>
+<body class="bg-gradient-to-br from-slate-900 to-slate-800 text-slate-100 min-h-screen font-sans selection:bg-indigo-500 selection:text-white overflow-hidden fixed w-full">
+
+<div id="app" class="h-full w-full flex flex-col items-center justify-center p-4 md:p-8 overflow-y-auto">
+
+    <!-- Main Container -->
+    <div class="glass-panel w-full max-w-md rounded-3xl shadow-2xl overflow-hidden relative transition-all duration-500 flex flex-col max-h-[90vh]">
+
+        <!-- Header -->
+        <div class="p-6 border-b border-white/10 flex justify-between items-center shrink-0">
+            <h1 class="text-xl font-bold flex items-center gap-2 text-indigo-300">
+                <i data-lucide="timer" class="w-6 h-6"></i>
+                <span class="hidden sm:inline">Random Timer</span>
+            </h1>
+            <div class="flex gap-1 sm:gap-2">
+                <button id="shareBtn"
+                        class="p-2 rounded-full hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
+                        title="Share / Send to Phone">
+                    <i data-lucide="share-2" class="w-5 h-5"></i>
+                </button>
+                <button id="saveBtn"
+                        class="p-2 rounded-full hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
+                        title="Download HTML">
+                    <i data-lucide="download" class="w-5 h-5"></i>
+                </button>
+                <button id="muteBtn"
+                        class="p-2 rounded-full hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
+                        title="Toggle Sound">
+                    <i data-lucide="volume-2" class="w-5 h-5"></i>
+                </button>
+                <button id="zenBtn"
+                        class="p-2 rounded-full hover:bg-white/10 transition-colors text-slate-400 hover:text-white"
+                        title="Toggle Countdown Visibility">
+                    <i data-lucide="eye" class="w-5 h-5"></i>
+                </button>
+            </div>
+        </div>
+
+        <!-- Content Area -->
+        <div class="p-6 sm:p-8 flex flex-col items-center overflow-y-auto">
+
+            <!-- Timer Display Circle -->
+            <div class="relative w-56 h-56 sm:w-64 sm:h-64 mb-6 sm:mb-8 flex items-center justify-center shrink-0">
+                <!-- Progress Ring Background -->
+                <div class="absolute inset-0 rounded-full border-4 border-slate-700/50"></div>
+
+                <!-- Status Circle/Button -->
+                <div id="statusCircle"
+                     class="w-48 h-48 sm:w-56 sm:h-56 rounded-full bg-slate-800 flex flex-col items-center justify-center shadow-[0_0_30px_rgba(79,70,229,0.1)] transition-all duration-500 border border-white/5 relative overflow-hidden group cursor-pointer touch-manipulation">
+
+                    <!-- Status Glow -->
+                    <div id="statusGlow"
+                         class="absolute inset-0 bg-indigo-500/10 opacity-0 transition-opacity duration-500"></div>
+
+                    <!-- Main Display Text -->
+                    <div class="z-10 text-center px-4 select-none">
+                        <span id="statusLabel"
+                              class="block text-slate-400 text-sm font-medium tracking-wider uppercase mb-1">READY</span>
+                        <div id="timeDisplay"
+                             class="text-4xl sm:text-5xl font-mono font-bold text-white tracking-tighter">00:00
+                        </div>
+                        <div id="rangeDisplay"
+                             class="text-xs text-slate-500 mt-2 font-medium opacity-0 transition-opacity duration-300">
+                            20m - 40m
+                        </div>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Alarm Overlay (Hidden by default) -->
+            <div id="alarmOverlay"
+                 class="hidden absolute inset-0 z-50 bg-indigo-600 flex flex-col items-center justify-center text-center p-6 animate-fade-in">
+                <i data-lucide="bell-ring" class="w-16 h-16 text-white mb-4 animate-bounce"></i>
+                <h2 class="text-3xl font-bold text-white mb-2">Time's Up!</h2>
+                <p class="text-indigo-200 mb-8">Your random interval has finished.</p>
+                <button id="dismissBtn"
+                        class="bg-white text-indigo-600 px-8 py-3 rounded-full font-bold shadow-lg hover:bg-indigo-50 hover:scale-105 transition-all duration-200 active:scale-95 touch-manipulation">
+                    Dismiss & Continue
+                </button>
+            </div>
+
+            <!-- Controls Form (Visible when stopped) -->
+            <div id="controlsPanel" class="w-full space-y-4 sm:space-y-6 transition-all duration-300">
+
+                <div class="grid grid-cols-2 gap-4">
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold ml-1">Min (Min)</label>
+                        <input type="number" id="minInput" value="20" min="1" inputmode="numeric" pattern="[0-9]*"
+                               class="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-white placeholder-slate-600">
+                    </div>
+                    <div class="space-y-2">
+                        <label class="text-xs text-slate-400 uppercase font-bold ml-1">Max (Min)</label>
+                        <input type="number" id="maxInput" value="40" min="1" inputmode="numeric" pattern="[0-9]*"
+                               class="w-full bg-slate-800/50 border border-slate-700 rounded-xl px-4 py-3 text-center text-lg focus:outline-none focus:border-indigo-500 focus:ring-1 focus:ring-indigo-500 transition-all text-white placeholder-slate-600">
+                    </div>
+                </div>
+
+                <div class="flex items-center justify-between bg-slate-800/30 p-3 rounded-xl border border-white/5 cursor-pointer"
+                     onclick="document.getElementById('loopCheck').click()">
+                        <span class="text-sm font-medium text-slate-300 flex items-center gap-2">
+                            <i data-lucide="repeat" class="w-4 h-4 text-indigo-400"></i>
+                            Auto-Loop
+                        </span>
+                    <label class="relative inline-flex items-center cursor-pointer pointer-events-none">
+                        <input type="checkbox" id="loopCheck" class="sr-only peer" checked>
+                        <div class="w-11 h-6 bg-slate-700 peer-focus:outline-none rounded-full peer peer-checked:after:translate-x-full peer-checked:after:border-white after:content-[''] after:absolute after:top-[2px] after:left-[2px] after:bg-white after:border-gray-300 after:border after:rounded-full after:h-5 after:w-5 after:transition-all peer-checked:bg-indigo-500"></div>
+                    </label>
+                </div>
+
+                <button id="startBtn"
+                        class="w-full bg-indigo-600 hover:bg-indigo-500 text-white font-bold py-4 rounded-xl shadow-lg shadow-indigo-500/20 transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 group touch-manipulation">
+                    <i data-lucide="play" class="w-5 h-5 fill-current group-hover:scale-110 transition-transform"></i>
+                    Start Random Timer
+                </button>
+            </div>
+
+            <!-- Stop Control (Visible when running) -->
+            <div id="runningControls" class="w-full hidden">
+                <p id="targetMessage" class="text-center text-slate-400 text-sm mb-6">
+                    Timer will trigger randomly between <span class="text-white font-bold min-val">20</span> and <span
+                        class="text-white font-bold max-val">40</span> minutes.
+                </p>
+                <button id="stopBtn"
+                        class="w-full bg-slate-700 hover:bg-slate-600 text-white font-bold py-4 rounded-xl transition-all transform active:scale-[0.98] flex items-center justify-center gap-2 border border-white/5 touch-manipulation">
+                    <i data-lucide="square" class="w-5 h-5 fill-current"></i>
+                    Stop Timer
+                </button>
+            </div>
+
+        </div>
+    </div>
+
+    <p class="text-slate-500 text-xs mt-6 text-center px-4">Works offline. Add to Home Screen for full app
+        experience.</p>
+</div>
+
+<!-- Audio Element -->
+<script>
+    // State
+    const state = {
+        isRunning: false,
+        endTime: null,
+        timerId: null,
+        isMuted: false,
+        isZenMode: false,
+        currentDuration: 0 // ms
+    };
+
+    // DOM Elements
+    const els = {
+        startBtn: document.getElementById('startBtn'),
+        stopBtn: document.getElementById('stopBtn'),
+        minInput: document.getElementById('minInput'),
+        maxInput: document.getElementById('maxInput'),
+        timeDisplay: document.getElementById('timeDisplay'),
+        statusLabel: document.getElementById('statusLabel'),
+        controlsPanel: document.getElementById('controlsPanel'),
+        runningControls: document.getElementById('runningControls'),
+        statusCircle: document.getElementById('statusCircle'),
+        statusGlow: document.getElementById('statusGlow'),
+        rangeDisplay: document.getElementById('rangeDisplay'),
+        alarmOverlay: document.getElementById('alarmOverlay'),
+        dismissBtn: document.getElementById('dismissBtn'),
+        loopCheck: document.getElementById('loopCheck'),
+        muteBtn: document.getElementById('muteBtn'),
+        zenBtn: document.getElementById('zenBtn'),
+        saveBtn: document.getElementById('saveBtn'),
+        shareBtn: document.getElementById('shareBtn'),
+        targetMessage: document.getElementById('targetMessage')
+    };
+
+    // Initialize Icons
+    lucide.createIcons();
+
+    // Helpers
+    const formatTime = (ms) => {
+        if (ms < 0) ms = 0;
+        const totalSeconds = Math.floor(ms / 1000);
+        const minutes = Math.floor(totalSeconds / 60);
+        const seconds = totalSeconds % 60;
+        return `${minutes.toString().padStart(2, '0')}:${seconds.toString().padStart(2, '0')}`;
+    };
+
+    const getRandomTime = (min, max) => {
+        // Convert minutes to ms
+        const minMs = min * 60 * 1000;
+        const maxMs = max * 60 * 1000;
+        return Math.floor(Math.random() * (maxMs - minMs + 1) + minMs);
+    };
+
+    // Audio Logic (Oscillator to avoid external files)
+    const playAlarmSound = () => {
+        if (state.isMuted) return;
+
+        const AudioContext = window.AudioContext || window.webkitAudioContext;
+        if (!AudioContext) return;
+
+        const ctx = new AudioContext();
+
+        // Create a simple melody
+        const notes = [880, 1100, 880, 1100, 1320, 880]; // Frequencies in Hz
+        const duration = 0.15; // Seconds per note
+
+        notes.forEach((freq, i) => {
+            const osc = ctx.createOscillator();
+            const gain = ctx.createGain();
+
+            osc.type = 'sine';
+            osc.frequency.value = freq;
+
+            osc.connect(gain);
+            gain.connect(ctx.destination);
+
+            const startTime = ctx.currentTime + (i * duration);
+
+            gain.gain.setValueAtTime(0.2, startTime);
+            gain.gain.exponentialRampToValueAtTime(0.01, startTime + duration - 0.05);
+
+            osc.start(startTime);
+            osc.stop(startTime + duration);
+        });
+    };
+
+    // Timer Logic
+    const updateTimer = () => {
+        if (!state.isRunning) return;
+
+        const now = Date.now();
+        const remaining = state.endTime - now;
+
+        if (remaining <= 0) {
+            triggerAlarm();
+        } else {
+            if (state.isZenMode) {
+                els.timeDisplay.innerText = "Running";
+                els.timeDisplay.classList.add('text-2xl', 'animate-pulse');
+                els.timeDisplay.classList.remove('text-4xl', 'sm:text-5xl');
+            } else {
+                els.timeDisplay.innerText = formatTime(remaining);
+                els.timeDisplay.classList.remove('text-2xl', 'animate-pulse');
+                els.timeDisplay.classList.add('text-4xl', 'sm:text-5xl');
+            }
+
+            state.timerId = requestAnimationFrame(updateTimer);
+        }
+    };
+
+    const startTimer = () => {
+        let min = parseInt(els.minInput.value);
+        let max = parseInt(els.maxInput.value);
+
+        // Validation
+        if (isNaN(min) || min < 1) min = 1;
+        if (isNaN(max) || max < min) max = min;
+
+        els.minInput.value = min;
+        els.maxInput.value = max;
+
+        state.currentDuration = getRandomTime(min, max);
+        state.endTime = Date.now() + state.currentDuration;
+        state.isRunning = true;
+
+        // Update UI
+        els.controlsPanel.classList.add('hidden');
+        els.runningControls.classList.remove('hidden');
+        els.statusCircle.classList.add('animate-breathe', 'border-indigo-500/50');
+        els.statusGlow.classList.remove('opacity-0');
+        els.statusLabel.innerText = "WAITING...";
+        els.statusLabel.classList.add('text-indigo-400');
+
+        els.rangeDisplay.innerText = `${min}m - ${max}m Interval`;
+        els.rangeDisplay.classList.remove('opacity-0');
+
+        // Update info text
+        els.targetMessage.querySelector('.min-val').innerText = min;
+        els.targetMessage.querySelector('.max-val').innerText = max;
+
+        updateTimer();
+    };
+
+    const stopTimer = () => {
+        state.isRunning = false;
+        cancelAnimationFrame(state.timerId);
+
+        // Reset UI
+        els.controlsPanel.classList.remove('hidden');
+        els.runningControls.classList.add('hidden');
+        els.statusCircle.classList.remove('animate-breathe', 'border-indigo-500/50');
+        els.statusGlow.classList.add('opacity-0');
+        els.statusLabel.innerText = "READY";
+        els.statusLabel.classList.remove('text-indigo-400');
+        els.rangeDisplay.classList.add('opacity-0');
+        els.timeDisplay.innerText = "00:00";
+
+        // Fix zen mode text size reset
+        els.timeDisplay.classList.remove('text-2xl', 'animate-pulse');
+        els.timeDisplay.classList.add('text-4xl', 'sm:text-5xl');
+    };
+
+    const triggerAlarm = () => {
+        state.isRunning = false;
+        cancelAnimationFrame(state.timerId);
+
+        playAlarmSound();
+
+        // Interval backup sound (in case browser throttles single play)
+        const alarmInterval = setInterval(playAlarmSound, 2500);
+
+        els.alarmOverlay.classList.remove('hidden');
+        els.alarmOverlay.classList.add('flex'); // Ensure flex is added back
+
+        // Handle Dismiss
+        els.dismissBtn.onclick = () => {
+            clearInterval(alarmInterval);
+            els.alarmOverlay.classList.add('hidden');
+            els.alarmOverlay.classList.remove('flex');
+
+            if (els.loopCheck.checked) {
+                startTimer();
+            } else {
+                stopTimer();
+            }
+        };
+    };
+
+    // Event Listeners
+    els.startBtn.addEventListener('click', startTimer);
+    els.stopBtn.addEventListener('click', stopTimer);
+
+    els.muteBtn.addEventListener('click', () => {
+        state.isMuted = !state.isMuted;
+        const icon = state.isMuted ? 'volume-x' : 'volume-2';
+        els.muteBtn.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i>`;
+        lucide.createIcons();
+        els.muteBtn.classList.toggle('text-red-400', state.isMuted);
+    });
+
+    els.zenBtn.addEventListener('click', () => {
+        state.isZenMode = !state.isZenMode;
+        const icon = state.isZenMode ? 'eye-off' : 'eye';
+        els.zenBtn.innerHTML = `<i data-lucide="${icon}" class="w-5 h-5"></i>`;
+        lucide.createIcons();
+        els.zenBtn.classList.toggle('text-indigo-400', state.isZenMode);
+
+        if (state.isRunning) {
+            // Trigger immediate update to toggle text
+            cancelAnimationFrame(state.timerId);
+            updateTimer();
+        }
+    });
+
+    // Common Save Logic
+    const getFileBlob = () => {
+        const htmlContent = document.documentElement.outerHTML;
+        return new Blob([htmlContent], {type: 'text/html'});
+    }
+
+    // Save Functionality (Download)
+    els.saveBtn.addEventListener('click', () => {
+        const blob = getFileBlob();
+        const url = URL.createObjectURL(blob);
+        const a = document.createElement('a');
+        a.href = url;
+        a.download = 'random-interval-timer.html';
+        document.body.appendChild(a);
+        a.click();
+        document.body.removeChild(a);
+        URL.revokeObjectURL(url);
+    });
+
+    // Share Functionality (Mobile/Native)
+    els.shareBtn.addEventListener('click', async () => {
+        const blob = getFileBlob();
+        const file = new File([blob], 'random-interval-timer.html', {type: 'text/html'});
+
+        if (navigator.share && navigator.canShare({files: [file]})) {
+            try {
+                await navigator.share({
+                    files: [file],
+                    title: 'Random Interval Timer',
+                    text: 'A simple random timer tool.'
+                });
+            } catch (err) {
+                console.log('Share failed or canceled', err);
+            }
+        } else {
+            alert('Sharing files is not supported on this browser. Please use the Save button.');
+        }
+    });
+
+    // Click on the big circle acts as Start/Stop depending on state
+    els.statusCircle.addEventListener('click', () => {
+        if (!state.isRunning && !state.endTime) {
+            startTimer();
+        }
+    });
+
+    // Clean slate on load
+    stopTimer();
+
+</script>
+</body>
+</html>
